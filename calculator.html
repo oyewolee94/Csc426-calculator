@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --panel: #141418;
+      --surface: #1c1c22;
+      --border: #2a2a35;
+      --accent: #00e5ff;
+      --accent2: #7b2fff;
+      --text-main: #e8eaf0;
+      --text-dim: #6a6a80;
+      --btn-default: #1e1e28;
+      --btn-op: #1a1a30;
+      --btn-eq: #00e5ff;
+      --btn-clear: #2a0030;
+      --glow: 0 0 18px rgba(0,229,255,0.35);
+      --glow-eq: 0 0 22px rgba(0,229,255,0.55);
+      --glow-clear: 0 0 18px rgba(123,47,255,0.45);
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-family: 'Share Tech Mono', monospace;
+      overflow: hidden;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridShift 20s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes gridShift {
+      0% { background-position: 0 0; }
+      100% { background-position: 40px 40px; }
+    }
+
+    .calc-wrapper {
+      position: relative;
+      z-index: 1;
+      perspective: 1200px;
+    }
+
+    .calculator {
+      width: 340px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px 20px 20px;
+      box-shadow:
+        0 0 0 1px rgba(0,229,255,0.08),
+        0 30px 80px rgba(0,0,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      animation: floatIn 0.6s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(40px) rotateX(6deg); }
+      to   { opacity: 1; transform: translateY(0) rotateX(0deg); }
+    }
+
+    /* Brand bar */
+    .brand {
+      text-align: center;
+      margin-bottom: 16px;
+      letter-spacing: 0.3em;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .brand span {
+      color: var(--accent);
+      filter: drop-shadow(0 0 6px var(--accent));
+    }
+
+    /* Display */
+    .display {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px 12px;
+      margin-bottom: 20px;
+      min-height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: flex-end;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .display::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+
+    .expression {
+      font-size: 12px;
+      color: var(--text-dim);
+      min-height: 18px;
+      word-break: break-all;
+      text-align: right;
+      transition: color 0.2s;
+    }
+
+    .result {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: 0.02em;
+      word-break: break-all;
+      text-align: right;
+      transition: color 0.15s;
+      line-height: 1.15;
+    }
+
+    .result.glow {
+      color: var(--accent);
+      text-shadow: 0 0 16px rgba(0,229,255,0.5);
+    }
+
+    .result.error {
+      font-size: 20px;
+      color: #ff4f6a;
+      text-shadow: 0 0 10px rgba(255,79,106,0.5);
+    }
+
+    /* Button Grid */
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      height: 64px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--btn-default);
+      color: var(--text-main);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.13s ease;
+      position: relative;
+      overflow: hidden;
+      outline: none;
+      user-select: none;
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.12) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.13s;
+    }
+
+    button:active::after { opacity: 1; }
+
+    button:hover {
+      border-color: rgba(0,229,255,0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    button:active {
+      transform: translateY(0) scale(0.96);
+      box-shadow: none;
+    }
+
+    /* Operator buttons */
+    button.op {
+      background: var(--btn-op);
+      color: var(--accent);
+      border-color: rgba(0,229,255,0.18);
+      font-size: 20px;
+    }
+
+    button.op:hover {
+      background: rgba(0,229,255,0.08);
+      box-shadow: var(--glow);
+    }
+
+    /* Clear button */
+    button.clear {
+      background: var(--btn-clear);
+      color: #d67fff;
+      border-color: rgba(123,47,255,0.35);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    button.clear:hover {
+      background: rgba(123,47,255,0.15);
+      box-shadow: var(--glow-clear);
+      border-color: rgba(123,47,255,0.6);
+    }
+
+    /* Equals button */
+    button.eq {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      font-size: 24px;
+      font-weight: bold;
+      grid-column: span 2;
+      box-shadow: var(--glow);
+    }
+
+    button.eq:hover {
+      background: #33eeff;
+      box-shadow: var(--glow-eq);
+      transform: translateY(-2px);
+    }
+
+    button.eq:active {
+      transform: scale(0.97);
+      box-shadow: var(--glow);
+    }
+
+    /* Backspace */
+    button.back {
+      font-size: 20px;
+      color: #ff7096;
+      border-color: rgba(255,112,150,0.2);
+    }
+
+    button.back:hover {
+      border-color: rgba(255,112,150,0.5);
+      background: rgba(255,112,150,0.07);
+    }
+
+    /* Zero */
+    button.zero {
+      grid-column: span 2;
+    }
+
+    /* Ripple flash on result */
+    @keyframes flashResult {
+      0%   { background: rgba(0,229,255,0.08); }
+      100% { background: var(--surface); }
+    }
+
+    .display.flash {
+      animation: flashResult 0.3s ease;
+    }
+
+    /* Tooltip for operators */
+    .tooltip-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      display: block;
+      line-height: 1;
+      margin-top: 2px;
+      letter-spacing: 0.05em;
+    }
+
+    button.op .btn-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div class="calc-wrapper">
+  <div class="calculator">
+    <div class="brand">CALC <span>X</span>-1</div>
+
+    <div class="display" id="display">
+      <div class="expression" id="expression"></div>
+      <div class="result" id="result">0</div>
+    </div>
+
+    <div class="buttons">
+
+      <!-- Row 1 -->
+      <button class="clear" onclick="clearAll()">C</button>
+      <button class="back" onclick="backspace()" title="Backspace">⌫</button>
+      <button class="op" onclick="inputOp('^')">
+        <div class="btn-inner">^<span class="tooltip-label">power</span></div>
+      </button>
+      <button class="op" onclick="inputOp('%')">
+        <div class="btn-inner">%<span class="tooltip-label">mod</span></div>
+      </button>
+
+      <!-- Row 2 -->
+      <button onclick="inputNum('7')">7</button>
+      <button onclick="inputNum('8')">8</button>
+      <button onclick="inputNum('9')">9</button>
+      <button class="op" onclick="inputOp('/')">
+        <div class="btn-inner">÷<span class="tooltip-label">divide</span></div>
+      </button>
+
+      <!-- Row 3 -->
+      <button onclick="inputNum('4')">4</button>
+      <button onclick="inputNum('5')">5</button>
+      <button onclick="inputNum('6')">6</button>
+      <button class="op" onclick="inputOp('*')">
+        <div class="btn-inner">×<span class="tooltip-label">multiply</span></div>
+      </button>
+
+      <!-- Row 4 -->
+      <button onclick="inputNum('1')">1</button>
+      <button onclick="inputNum('2')">2</button>
+      <button onclick="inputNum('3')">3</button>
+      <button class="op" onclick="inputOp('-')">
+        <div class="btn-inner">−<span class="tooltip-label">minus</span></div>
+      </button>
+
+      <!-- Row 5 -->
+      <button onclick="inputOp('\\')">
+        <div class="btn-inner" style="font-size:14px">INT÷<span class="tooltip-label">int div</span></div>
+      </button>
+      <button class="zero" onclick="inputNum('0')">0</button>
+      <button onclick="inputDot()">.</button>
+      <!-- No plus here yet, it's on row below with = -->
+
+      <!-- Row 6 -->
+      <button class="op" onclick="inputOp('+')">
+        <div class="btn-inner">+<span class="tooltip-label">add</span></div>
+      </button>
+      <button class="eq" onclick="calculate()">=</button>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  let expression = '';
+  let justEvaluated = false;
+  let hasError = false;
+
+  const exprEl   = document.getElementById('expression');
+  const resultEl = document.getElementById('result');
+  const displayEl = document.getElementById('display');
+
+  const OPS = ['+', '-', '*', '/', '%', '^', '\\'];
+
+  function updateDisplay(val, isResult = false, isError = false) {
+    exprEl.textContent = expression;
+    resultEl.textContent = val;
+    resultEl.className = 'result';
+    if (isResult) resultEl.classList.add('glow');
+    if (isError) resultEl.classList.add('error');
+  }
+
+  function flashDisplay() {
+    displayEl.classList.remove('flash');
+    void displayEl.offsetWidth;
+    displayEl.classList.add('flash');
+  }
+
+  function inputNum(num) {
+    if (hasError) clearAll();
+    if (justEvaluated) {
+      // If last char was result and user types a number, start fresh
+      expression = '';
+      justEvaluated = false;
+    }
+    expression += num;
+    updateDisplay(expression);
+  }
+
+  function inputDot() {
+    if (hasError) clearAll();
+    if (justEvaluated) { expression = '0'; justEvaluated = false; }
+    // Prevent double dots in current number segment
+    const parts = expression.split(/[\+\-\*\/\%\^\\\(]/);
+    const last = parts[parts.length - 1];
+    if (last.includes('.')) return;
+    if (!last || OPS.includes(last)) expression += '0';
+    expression += '.';
+    updateDisplay(expression);
+  }
+
+  function inputOp(op) {
+    if (hasError) return;
+    justEvaluated = false;
+    if (!expression) {
+      if (op === '-') { expression = '-'; updateDisplay(expression); }
+      return;
+    }
+    const lastChar = expression.slice(-1);
+    if (OPS.includes(lastChar)) {
+      expression = expression.slice(0, -1);
+    }
+    expression += op;
+    updateDisplay(expression);
+  }
+
+  function backspace() {
+    if (hasError) { clearAll(); return; }
+    if (justEvaluated) { clearAll(); return; }
+    expression = expression.slice(0, -1);
+    updateDisplay(expression || '0');
+  }
+
+  function clearAll() {
+    expression = '';
+    hasError = false;
+    justEvaluated = false;
+    resultEl.className = 'result';
+    updateDisplay('0');
+  }
+
+  function calculate() {
+    if (!expression) return;
+
+    const raw = expression;
+
+    try {
+      // Handle integer division (\)
+      let evalExpr = raw;
+
+      // Replace \ with a special token, handle power ^
+      // We need to evaluate integer division and power ourselves
+      const result = evaluateExpression(evalExpr);
+
+      if (!isFinite(result)) throw new Error('Math Error');
+      if (isNaN(result)) throw new Error('Invalid Input');
+
+      // Format: remove unnecessary decimals
+      const formatted = parseFloat(result.toPrecision(12)).toString();
+
+      exprEl.textContent = raw + ' =';
+      resultEl.textContent = formatted;
+      resultEl.className = 'result glow';
+      flashDisplay();
+
+      expression = formatted;
+      justEvaluated = true;
+      hasError = false;
+
+    } catch (e) {
+      resultEl.textContent = e.message || 'Error';
+      resultEl.className = 'result error';
+      exprEl.textContent = raw;
+      hasError = true;
+    }
+  }
+
+  // Custom evaluator to handle ^, \, and standard ops safely
+  function evaluateExpression(expr) {
+    // Tokenize
+    // Replace integer division \ with a unique marker, then handle
+    // We'll parse manually using a simple recursive descent / shunting yard
+
+    const tokens = tokenize(expr);
+    return parseExpr(tokens);
+  }
+
+  function tokenize(expr) {
+    const tokens = [];
+    let i = 0;
+    while (i < expr.length) {
+      const ch = expr[i];
+      if (/\d/.test(ch) || (ch === '.' && /\d/.test(expr[i+1] || ''))) {
+        let num = '';
+        while (i < expr.length && (/\d/.test(expr[i]) || expr[i] === '.')) {
+          num += expr[i++];
+        }
+        tokens.push({ type: 'num', val: parseFloat(num) });
+      } else if (ch === '-' && (tokens.length === 0 || tokens[tokens.length-1].type === 'op')) {
+        // Unary minus
+        let num = '-';
+        i++;
+        while (i < expr.length && (/\d/.test(expr[i]) || expr[i] === '.')) {
+          num += expr[i++];
+        }
+        tokens.push({ type: 'num', val: parseFloat(num) });
+      } else if (['+','-','*','/','%','^','\\'].includes(ch)) {
+        tokens.push({ type: 'op', val: ch });
+        i++;
+      } else {
+        throw new Error('Invalid Input');
+      }
+    }
+    return tokens;
+  }
+
+  // Shunting-yard algorithm
+  const PREC = { '+': 1, '-': 1, '*': 2, '/': 2, '%': 2, '\\': 2, '^': 3 };
+  const RIGHT_ASSOC = new Set(['^']);
+
+  function applyOp(op, b, a) {
+    switch(op) {
+      case '+': return a + b;
+      case '-': return a - b;
+      case '*': return a * b;
+      case '/':
+        if (b === 0) throw new Error('Divide by 0');
+        return a / b;
+      case '%': return a % b;
+      case '^': return Math.pow(a, b);
+      case '\\':
+        if (b === 0) throw new Error('Divide by 0');
+        return Math.trunc(a / b);
+      default: throw new Error('Unknown operator');
+    }
+  }
+
+  function parseExpr(tokens) {
+    const output = [];
+    const ops = [];
+
+    for (const tok of tokens) {
+      if (tok.type === 'num') {
+        output.push(tok.val);
+      } else if (tok.type === 'op') {
+        while (
+          ops.length &&
+          ops[ops.length-1].type === 'op' &&
+          (
+            PREC[ops[ops.length-1].val] > PREC[tok.val] ||
+            (PREC[ops[ops.length-1].val] === PREC[tok.val] && !RIGHT_ASSOC.has(tok.val))
+          )
+        ) {
+          const op = ops.pop();
+          const b = output.pop(), a = output.pop();
+          output.push(applyOp(op.val, b, a));
+        }
+        ops.push(tok);
+      }
+    }
+
+    while (ops.length) {
+      const op = ops.pop();
+      const b = output.pop(), a = output.pop();
+      output.push(applyOp(op.val, b, a));
+    }
+
+    if (output.length !== 1) throw new Error('Invalid Input');
+    return output[0];
+  }
+
+  // Keyboard support
+  document.addEventListener('keydown', e => {
+    if (e.key >= '0' && e.key <= '9') inputNum(e.key);
+    else if (e.key === '.') inputDot();
+    else if (e.key === '+') inputOp('+');
+    else if (e.key === '-') inputOp('-');
+    else if (e.key === '*') inputOp('*');
+    else if (e.key === '/') { e.preventDefault(); inputOp('/'); }
+    else if (e.key === '%') inputOp('%');
+    else if (e.key === '^') inputOp('^');
+    else if (e.key === '\\') inputOp('\\');
+    else if (e.key === 'Enter' || e.key === '=') calculate();
+    else if (e.key === 'Backspace') backspace();
+    else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') clearAll();
+  });
+</script>
+</body>
+</html>
